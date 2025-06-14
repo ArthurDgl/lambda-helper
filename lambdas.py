@@ -10,10 +10,18 @@ class LambdaExpression:
         self.scope = scope
         self.construct(expression, scope)
     
+    def __str__(self):
+        return self.get_expression({})
+    
+    def __eq__(self, value):
+        if not isinstance(value, LambdaExpression):
+            return False
+        return str(self) == str(value)
+    
     def print_tree(self, offset = ""):
         self.child.print_tree(offset + ("| " if self.id != "0" else ""))
     
-    def get_expression(self, indices = {}):
+    def get_expression(self, indices):
         return self.child.get_expression(indices)
     
     def construct(self, expression: str, scope):
@@ -24,6 +32,10 @@ class LambdaExpression:
             self.child = DefinitionExpression(expression, self.id, scope)
         else:
             self.child = ApplicationExpression(expression, self.id, scope)
+    
+    def propagate_id_scope(self, id, id_map):
+        self.id = id
+        self.child.propagate_id_scope(self.id, id_map)
     
     def can_reduce(self):
         return False
@@ -41,6 +53,7 @@ class LambdaExpression:
             raise(Exception("Attempted to reduce a non directly reducible ApplicationExpression"))
         self.child.left.child.initiate_replacement(self.child.right.child)
         self.child = self.child.left.child.lambda_expression.child
+        self.propagate_id_scope(self.id, {})
     
     def replace_with(self, symbol, scope, value_to_copy):
         if not isinstance(self.child, VariableExpression):
@@ -83,7 +96,7 @@ class DefinitionExpression(LambdaExpression):
             indices[self.variable] = [self.id]
         elif self.id not in indices[self.variable]:
             indices[self.variable].append(self.id)
-        return f"λ{self.variable}{indices[self.variable].index(self.id)}.{self.lambda_expression.get_expression(indices)}"
+        return f"λ{self.variable}{indices[self.variable].index(self.id) if len(indices[self.variable]) > 1 else ""}.{self.lambda_expression.get_expression(indices)}"
 
     def construct(self, expression: str, scope):
         if expression[0] != 'λ' or not VariableExpression.is_variable_character(expression[1]) or expression[2] != '.' or len(expression) <= 3:
@@ -91,6 +104,11 @@ class DefinitionExpression(LambdaExpression):
         self.variable = expression[1]
         scope[self.variable] = self.id
         self.lambda_expression = LambdaExpression(expression[3:], self.id + ".0", scope)
+    
+    def propagate_id_scope(self, id, id_map):
+        id_map[self.id] = id
+        self.id = id
+        self.lambda_expression.propagate_id_scope(self.id + ".0", id_map)
     
     def can_reduce_with(self, character: str):
         return self.variable == character
@@ -139,6 +157,11 @@ class ApplicationExpression(LambdaExpression):
         self.left = LambdaExpression(func, self.id + ".0", scope)
         self.right = LambdaExpression(value, self.id + ".1", scope)
     
+    def propagate_id_scope(self, id, id_map):
+        self.id = id
+        self.left.propagate_id_scope(self.id + ".0", id_map)
+        self.right.propagate_id_scope(self.id + ".1", id_map)
+    
     def can_reduce(self):
         return isinstance(self.left.child, DefinitionExpression)
     
@@ -184,13 +207,19 @@ class VariableExpression(LambdaExpression):
         print(offset + self.symbol + "    bb " + self.bounded_by)
     
     def get_expression(self, indices):
-        return self.symbol + (str(indices[self.symbol].index(self.bounded_by)) if self.symbol in indices else "")
+        return self.symbol + (str(indices[self.symbol].index(self.bounded_by)) if self.symbol in indices and len(indices[self.symbol]) > 1 else "")
     
     def construct(self, expression: str, scope):
         if len(expression) != 1:
             raise(ValueError(f'VariableExpression cannot be constructed with multi-character expression : "{expression}", please use single character.'))
         self.symbol = expression
-        self.bounded_by = scope[self.symbol]
+        self.bounded_by = scope[self.symbol] if self.symbol in scope else None
+    
+    def propagate_id_scope(self, id, id_map):
+        self.id = id
+        if self.bounded_by and self.bounded_by in id_map:
+            self.bounded_by = id_map[self.bounded_by]
+
     
     def can_reduce(self):
         return super().can_reduce()

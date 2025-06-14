@@ -1,37 +1,33 @@
-import lambdas
+import solver
 
 def main():
-    expression = lambdas.LambdaExpression("(Ln.Lm.Lf.Lx.nmfx)(Lf.Lx.f(f(x)))(Lf.Lx.f(f(f(x))))")
-    print(expression.get_expression())
-    # expression.print_tree()
+    examples = ["(Lx.x(Lx.Ly.y)(Lx.Ly.x))(Lx.Ly.x)",
+                "(Lx.x(Lx.Ly.y)(Lx.Ly.x))(Lx.Ly.y)",
+                "(Ln.Lm.Lf.Lx.nf(mfx))(Lf.Lx.f(fx))(Lf.Lx.f(f(fx)))",
+                "(Ln.Lm.Lf.Lx.n(mf)x)(Lf.Lx.f(fx))(Lf.Lx.f(f(fx)))",
+                "(Ln.Lm.Lf.Lx.mnfx)(Lf.Lx.f(fx))(Lf.Lx.f(f(fx)))"
+                ]
+    print("Example Expressions :")
+    for i, ex in enumerate(examples):
+        print(f"  {i} : {ex}")
+    print("Please type lambda expression or choose example by typing its index :")
+    inp = input(" >> ")
 
-    while True:
-        reductions = expression.find_reductions()
-        if len(reductions) == 0:
-            break
-        print(reductions)
-        inp = input(" >> ")
-        if inp == 'q':
-            break
-        elif inp == '':
-            index = 0
-        else:
-            index = int(inp)
-        
-        expression.apply_reduction(reductions[index])
-        print(expression.get_expression())
+    expression = ""
+    if inp.isdigit() and int(inp) < len(examples):
+        expression = examples[int(inp)]
+    else:
+        expression = inp
+    
+    lambda_solver = solver.LambdaSolver(expression, vis=True)
+
+    print(f"Solving expression : {str(lambda_solver.start)} ...")
+    success = lambda_solver.solve()
+    if success:
+        print(f"Solution Found : {str(lambda_solver.solution)}")
+    else:
+        print("No Solution Found after 1000 iterations...")
 
 
 if __name__ == "__main__":
     main()
-
-'''
-TODO:
-
-remove scope & bounds system
-
-remake id propagation
-
-implement multi character variables
-
-'''
